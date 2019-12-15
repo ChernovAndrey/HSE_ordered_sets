@@ -38,3 +38,56 @@ def get_dataset_loan_credits():
     # train[train.loc['Gender'] == ]
     train.drop([name_y, 'Loan_ID'], axis=1, inplace=True)
     return train, test, y_train
+
+
+def binarization_dataset(X, prep_feat):
+    # quant = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+    quant = [0.25, 0.50, 0.75]
+
+    def bound_split_log1p(x, quant):  # TODO: check nans
+        if np.log1p(x) < quant:
+            return 1
+        else:
+            return 0
+
+    # print('information about features:')
+    # print(X[prep_feat].describe())
+    dstat = {}
+    for feat in prep_feat:
+        s = np.log1p(X[feat].dropna())
+        # print('features: ', feat)
+        # print(s.describe())
+        # sns.distplot(s)
+        # plt.show()
+        stat = s.describe()
+
+        dstat[feat] = np.quantile(s, quant)
+        # dstat[feat] = [stat['25%'], stat['50%'], stat['75%']]
+
+    X.loc[X.loc[:, 'CoapplicantIncome'] < 3.0, 'CoapplicantIncome'] = 0
+    X.loc[X.loc[:, 'CoapplicantIncome'] >= 3.0, 'CoapplicantIncome'] = 1
+
+    X.loc[X.loc[:, 'Loan_Amount_Term'] == 360, 'Loan_Amount_Term'] = 1
+    X.loc[X.loc[:, 'Loan_Amount_Term'] < 360, 'Loan_Amount_Term'] = 0
+    for j in range(len(quant)):
+        X['LoanAmount_' + str(quant[j])] = X['LoanAmount'].apply(lambda x: bound_split_log1p(x, dstat[feat][j]))
+
+    # X['LoanAmount_25'] = X['LoanAmount'].apply(lambda x: bound_split_log1p(x, dstat[feat][0]))
+    # X['LoanAmount_50'] = X['LoanAmount'].apply(lambda x: bound_split_log1p(x, dstat[feat][1]))
+    # X['LoanAmount_75'] = X['LoanAmount'].apply(lambda x: bound_split_log1p(x, dstat[feat][2]))
+    for j in range(len(quant)):
+        X['ApplicantIncome_' + str(quant[j])] = X['ApplicantIncome'].apply(
+            lambda x: bound_split_log1p(x, dstat[feat][j]))
+
+    # X['ApplicantIncome_25'] = X['LoanAmount'].apply(lambda x: bound_split_log1p(x, dstat[feat][0]))
+    # X['ApplicantIncome_50'] = X['LoanAmount'].apply(lambda x: bound_split_log1p(x, dstat[feat][1]))
+    # X['ApplicantIncome_75'] = X['LoanAmount'].apply(lambda x: bound_split_log1p(x, dstat[feat][2]))
+    return X.drop(['ApplicantIncome', 'LoanAmount'], axis=1)
+
+
+def norm_dataset(X, prep_feat):
+    for feat in prep_feat:
+        mu = np.mean(X[feat].dropna())
+        sigma = np.sqrt(np.var(X[feat].dropna(), ddof=1))
+        X[feat] = (X - mu) / sigma
+    return X
