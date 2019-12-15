@@ -10,6 +10,7 @@ from sklearn.model_selection import cross_val_score
 from sklearn.metrics import precision_recall_fscore_support
 from aggregate_functions import *
 
+from sklearn.svm import LinearSVC
 prep_feat = ['ApplicantIncome', 'LoanAmount']  # continuous features
 
 use_pattern_structure = False
@@ -131,22 +132,59 @@ def approach_learn_param(X_train, X_val, y_train, index_prep_feat):
 
 
 def get_score(y_pred, y_val):
-    acc = len(np.where(y_pred.astype(int) == y_val.astype(int))[0]) / len(X_val)
+    acc = len(np.where(y_pred.astype(int) == y_val.astype(int))[0]) / len(y_val)
     p, r, f, _ = precision_recall_fscore_support(y_val, y_pred, average='binary')
     print('accuracy:', acc)
     print('f1 score:', f)
     return acc, p, r, f, confusion_matrix(y_val, y_pred)
 
+def log_regression(X_train, y_train, cv=10):
+    f1 = np.zeros(cv)
+    acc = np.zeros(cv)
+    precision = np.zeros(cv)
+    recall = np.zeros(cv)
+    m_conf = np.zeros((cv, 2, 2))
+    for i in range(cv):
+        print('start cv number: ', i + 1)
+        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.10, stratify=y_train)
+        clf= LogisticRegression(solver='lbfgs').fit(X_train, y_train)
+        y_pred = clf.predict(X_val)
+        acc[i], precision[i], recall[i], f1[i], m_conf[i] = get_score(y_pred, y_val)
 
-def log_regression(X, y):
-    clf = LogisticRegression(solver='lbfgs')
-    print(np.mean(cross_val_score(clf, X.fillna(0.0), y, cv=10, scoring='f1')))
+    print('result cross val:')
+    print('mean f1:', np.mean(f1))
+    print('mean acc:', np.mean(acc))
+    print('mean precision:', np.mean(precision))
+    print('mean recall:', np.mean(recall))
+    print('mean confusion matrix:')
+    print(np.mean(m_conf, axis=0))
 
+def svm_regression(X_train, y_train, cv=10):
+    f1 = np.zeros(cv)
+    acc = np.zeros(cv)
+    precision = np.zeros(cv)
+    recall = np.zeros(cv)
+    m_conf = np.zeros((cv, 2, 2))
+    for i in range(cv):
+        print('start cv number: ', i + 1)
+        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.10, stratify=y_train)
+        clf = LinearSVC(random_state=0, tol=1e-5).fit(X_train, y_train)
+        y_pred = clf.predict(X_val)
+        acc[i], precision[i], recall[i], f1[i], m_conf[i] = get_score(y_pred, y_val)
+
+    print('result cross val:')
+    print('mean f1:', np.mean(f1))
+    print('mean acc:', np.mean(acc))
+    print('mean precision:', np.mean(precision))
+    print('mean recall:', np.mean(recall))
+    print('mean confusion matrix:')
+    print(np.mean(m_conf, axis=0))
 
 if __name__ == "__main__":
     # X_train, X_val, y_train = get_dataset0()
     X_train, X_test, y_train = get_dataset_loan_credits()
-    # log_regression(X_train, y_train)
+    svm_regression(X_train.fillna(0.0).values, y_train.values)
+    # log_regression(X_train.fillna(0.0).values, y_train.values)
 
     if use_pattern_structure:
         X_train = norm_dataset(X_train, prep_feat)
@@ -173,7 +211,7 @@ if __name__ == "__main__":
     m_conf = np.zeros((cv, 2, 2))
     for i in range(cv):
         print('start cv number: ', i + 1)
-        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.15, stratify=y_train)
+        X_train, X_val, y_train, y_val = train_test_split(X_train, y_train, test_size=0.10, stratify=y_train)
         y_pred = estimator(X_train, X_val, y_train, index_prep_feat)
         acc[i], precision[i], recall[i], f1[i], m_conf[i] = get_score(y_pred, y_val)
 
